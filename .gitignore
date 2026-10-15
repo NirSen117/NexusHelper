@@ -1,0 +1,21 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local agent handoff: never commit or push this file
+docs/AGENT_HANDOFF.md
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
