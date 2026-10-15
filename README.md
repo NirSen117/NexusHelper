@@ -29,10 +29,6 @@ Open `http://127.0.0.1:8000/docs` for the API docs. `POST /query` returns a demo
 
 Copy `.env.example` to `.env`. Never commit `.env`, credentials, or real company data. The starter intentionally contains no provider keys.
 
-## Repository notes
-
-`docs/AGENT_HANDOFF.md` contains local development context and is excluded from Git. Keep it on this machine; do not force-add it.
-
 ## Roadmap
 
 1. Add authentication and derive permission scope from trusted identity claims.
