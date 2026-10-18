@@ -13,6 +13,19 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - name: Require Firebase and API configuration
+        shell: bash
+        env:
+          VITE_API_URL: ${{ vars.NEXUSHELPER_API_URL }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_NEXUSHELPER }}
+        run: |
+          for key in VITE_API_URL VITE_FIREBASE_API_KEY VITE_FIREBASE_AUTH_DOMAIN FIREBASE_PROJECT_ID VITE_FIREBASE_APP_ID FIREBASE_SERVICE_ACCOUNT; do
+            if [[ -z "${!key}" ]]; then echo "Missing GitHub variable/secret: ${key}" >&2; exit 1; fi
+          done
       - name: Build frontend
         working-directory: frontend
         env:

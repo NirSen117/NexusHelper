@@ -49,6 +49,18 @@ jobs:
       - name: Generate platform icons
         working-directory: frontend
         run: tauri icon src-tauri/icons/nexushelper.svg --output src-tauri/icons
+      - name: Require Firebase and API configuration
+        shell: bash
+        env:
+          VITE_API_URL: ${{ vars.NEXUSHELPER_API_URL }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+        run: |
+          for key in VITE_API_URL VITE_FIREBASE_API_KEY VITE_FIREBASE_AUTH_DOMAIN FIREBASE_PROJECT_ID VITE_FIREBASE_APP_ID; do
+            if [[ -z "${!key}" ]]; then echo "Missing GitHub repository variable: ${key}" >&2; exit 1; fi
+          done
       - name: Build installer
         working-directory: frontend
         env:
