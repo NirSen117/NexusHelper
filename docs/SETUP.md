@@ -19,8 +19,6 @@ The current implementation uses FalkorDB for a separate graph per company. Fires
 
 For a genuinely local-only mode, the API and graph may run on the user's machine, but that mode does not share company data by itself. The planned cross-company mode requires a hosted API and shared database services reachable by all authorized clients.
 
-The UI includes a platform download page, but release installers are not published yet. Do not advertise downloadable builds until Linux (AppImage/.deb), macOS, and Windows packages are built, signed where applicable, and hosted at stable release URLs.
-
 ## Local development
 
 1. Install Python dependencies and run `uvicorn app.main:app --reload`.
