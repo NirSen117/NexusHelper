@@ -19,3 +19,17 @@ docs/AGENT_HANDOFF.md
 .DS_Store
 .vscode/
 .idea/
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+service-account*.json
+*-firebase-adminsdk-*.json
+
+# Local runtime data
+.local_data/
+data/
+
+# Tauri build output
+frontend/src-tauri/target/
