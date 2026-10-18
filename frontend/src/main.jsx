@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { Activity, ArrowUpRight, Building2, Check, CircleHelp, Download, FileText, GitBranch, KeyRound, Layers3, LogOut, Menu, MessageSquareText, PanelLeftClose, PanelLeftOpen, Settings2, ShieldCheck, Sparkles, UserRound, Users, X } from 'lucide-react';
+import { Activity, ArrowUpRight, Building2, Check, CircleHelp, FileText, GitBranch, KeyRound, Layers3, LogOut, Menu, MessageSquareText, PanelLeftClose, PanelLeftOpen, Settings2, ShieldCheck, Sparkles, UserRound, Users, X } from 'lucide-react';
 import { auth, firebaseConfigured } from './firebase';
 import './style.css';
 
@@ -140,7 +140,6 @@ function App() {
         <button className={`nav-item nav-button ${activeSection === 'sources' ? 'active' : ''}`} onClick={() => navigate('sources')}><FileText size={17}/> <span className="nav-text">Sources</span></button>
         <button className={`nav-item nav-button ${activeSection === 'people' ? 'active' : ''}`} onClick={() => navigate('people')}><Users size={17}/> <span className="nav-text">People &amp; teams</span></button>
         <button className={`nav-item nav-button ${activeSection === 'companies' ? 'active' : ''}`} onClick={() => navigate('companies')}><Building2 size={17}/> <span className="nav-text">Companies &amp; teams</span></button>
-        <button className={`nav-item nav-button ${activeSection === 'download' ? 'active' : ''}`} onClick={() => navigate('download')}><Download size={17}/> <span className="nav-text">Install NexusHelper</span></button>
       </nav>
       <div className="nav-label source-label">YOUR CONTEXT</div>
       <div className="context-card"><div className="context-icon"><Building2 size={15}/></div><div><strong>Build your profile</strong><small>Add your role and team keywords</small></div><button aria-label="Set profile" onClick={() => setProfileOpen(true)} title="Set up your profile"><ArrowUpRight size={15}/></button></div>
@@ -150,7 +149,7 @@ function App() {
     </aside>
 
     <main className="main-area">
-      <header className="topbar"><div className="topbar-leading"><button className="mobile-menu-toggle" aria-label="Open navigation menu" title="Open navigation menu" onClick={() => setMobileMenuOpen(true)}><Menu size={20}/></button><div className="breadcrumbs"><span>Workspace</span><span className="crumb-slash">/</span><b>{activeSection === 'ask' ? 'Ask NexusHelper' : activeSection === 'graph' ? 'Knowledge graph' : activeSection === 'sources' ? 'Sources' : activeSection === 'people' ? 'People & teams' : activeSection === 'companies' ? 'Companies & teams' : activeSection === 'download' ? 'Install NexusHelper' : 'Setup & connections'}</b></div></div><div className="top-actions"><label className="theme-control" title="Choose appearance"><span>THEME</span><select aria-label="Theme" value={theme} onChange={(event) => setTheme(event.target.value)}><option value="dark">Dark</option><option value="light">Light</option><option value="warm">Warm</option></select></label><button className="icon-button setup-tab-icon" aria-label="Setup and connections" title="Setup and connections" onClick={() => navigate('help')}><span aria-hidden="true">N</span></button><div className="top-divider"/>{activeUser ? <button className="avatar-button" onClick={() => setProfileOpen(true)}><img src={activeUser.photoURL || ''} alt="Profile"/></button> : <button className="top-signin" onClick={login}>{firebaseConfigured ? 'Sign in' : 'Try demo'} <ArrowUpRight size={14}/></button>}</div></header>
+      <header className="topbar"><div className="topbar-leading"><button className="mobile-menu-toggle" aria-label="Open navigation menu" title="Open navigation menu" onClick={() => setMobileMenuOpen(true)}><Menu size={20}/></button><div className="breadcrumbs"><span>Workspace</span><span className="crumb-slash">/</span><b>{activeSection === 'ask' ? 'Ask NexusHelper' : activeSection === 'graph' ? 'Knowledge graph' : activeSection === 'sources' ? 'Sources' : activeSection === 'people' ? 'People & teams' : activeSection === 'companies' ? 'Companies & teams' : 'Setup & connections'}</b></div></div><div className="top-actions"><label className="theme-control" title="Choose appearance"><span>THEME</span><select aria-label="Theme" value={theme} onChange={(event) => setTheme(event.target.value)}><option value="dark">Dark</option><option value="light">Light</option><option value="warm">Warm</option></select></label><button className="icon-button setup-tab-icon" aria-label="Setup and connections" title="Setup and connections" onClick={() => navigate('help')}><span aria-hidden="true">N</span></button><div className="top-divider"/>{activeUser ? <button className="avatar-button" onClick={() => setProfileOpen(true)}><img src={activeUser.photoURL || ''} alt="Profile"/></button> : <button className="top-signin" onClick={login}>{firebaseConfigured ? 'Sign in' : 'Try demo'} <ArrowUpRight size={14}/></button>}</div></header>
       <section className={`content ${activeSection !== 'ask' ? 'content-page' : ''}`}>
         {activeSection === 'companies' ? <CompanyHubPage firebaseUser={user} companies={companies} selectedCompanyId={companyId} onCompaniesChange={(list, selected) => { setCompanies(list); setCompanyId(selected || ''); if (selected) localStorage.setItem('nexushelper-company-id', selected); }} onLogin={login} /> : <>
         {activeSection === 'ask' ? <>
@@ -232,29 +231,22 @@ function CapabilityPage({ section, user, firebaseUser, demoSession, companyId, o
     graph: {
       icon: GitBranch, eyebrow: 'NEXUSHELPER KNOWLEDGE', title: 'Knowledge graph',
       description: 'Explore how services, teams, people, decisions, and evidence connect.',
-      status: workspace ? `FalkorDB connected · ${workspace.services.length} visible services` : 'Loading graph connection…',
-      detail: workspaceError || 'Live services and ownership are loaded from the company-specific FalkorDB graph using your verified access scope.',
+      status: workspace?.connected ? `FalkorDB connected · ${workspace.services.length} visible services` : workspaceLoading ? 'Checking company graph…' : 'Company graph not connected · general AI available',
+      detail: workspaceError || (workspace?.connected ? 'Live services and ownership are loaded from the company-specific FalkorDB graph using your verified access scope.' : 'NexusHelper can answer general questions without FalkorDB. Connect a graph only when you need company records and evidence.'),
       action: 'View graph setup',
-    },
-    download: {
-      icon: Download, eyebrow: 'NEXUSHELPER FOR DESKTOP', title: 'Get NexusHelper',
-      description: 'Use the same NexusHelper workspace from your desktop or browser. Sign-in will open securely in your browser and return you to the app.',
-      status: 'Desktop installers are being prepared',
-      detail: 'Linux, macOS, and Windows downloads will appear here when signed release builds are available. For now, run the web app locally using the developer setup guide.',
-      action: 'View install status',
     },
     sources: {
       icon: FileText, eyebrow: 'KNOWLEDGE SOURCES', title: 'Sources',
       description: 'Bring approved documents, tickets, and conversations into one searchable knowledge space.',
-      status: workspace ? `${workspace.sources.length} evidence sources in FalkorDB` : 'Loading connected sources…',
-      detail: workspaceError || 'Sources linked to visible incidents and evidence are loaded from the shared knowledge graph. External sync connectors are separate integrations.',
+      status: workspace?.connected ? `${workspace.sources.length} evidence sources in FalkorDB` : workspaceLoading ? 'Checking company graph…' : 'No graph sources connected',
+      detail: workspaceError || (workspace?.connected ? 'Sources linked to visible incidents and evidence are loaded from the shared knowledge graph. External sync connectors are separate integrations.' : 'General NexusHelper answers remain available. Company documents and source evidence require a connected graph.'),
       action: 'View connection details',
     },
     people: {
       icon: Users, eyebrow: 'YOUR ORGANIZATION', title: 'People & teams',
       description: 'Find team ownership and expertise using verified company profiles and memberships.',
-      status: user ? (workspace ? `${workspace.people.length} people · ${new Set(workspace.services.map((s) => s.team_id).filter(Boolean)).size} teams in scope` : 'Loading verified directory…') : 'Sign in to view your directory',
-      detail: workspaceError || (user ? `Signed in as ${workspace?.identity?.display_name || user.displayName || user.email || 'verified user'}. Team access comes from trusted membership, not profile text.` : 'Sign in with your company account to see identity-scoped team information.'),
+      status: user ? (workspace?.connected ? `${workspace.people.length} people · ${new Set(workspace.services.map((s) => s.team_id).filter(Boolean)).size} teams in scope` : workspaceLoading ? 'Loading verified directory…' : 'Company directory not connected') : 'Sign in to view your directory',
+      detail: workspaceError || (workspace?.connected ? `Signed in as ${workspace.identity?.display_name || user.displayName || user.email || 'verified user'}. Team access comes from trusted membership, not profile text.` : user ? 'The directory needs company graph data. You can still ask general questions in Ask NexusHelper.' : 'Sign in with your company account to see identity-scoped team information.'),
       action: user ? 'Set up your profile' : 'Sign in to continue',
     },
     help: {
@@ -270,7 +262,7 @@ function CapabilityPage({ section, user, firebaseUser, demoSession, companyId, o
   const handleAction = () => {
     if (section === 'people') {
       if (user) onProfile(); else onLogin();
-    } else if (section !== 'download') onToggleDetails();
+    } else onToggleDetails();
   };
   return <div className="capability-page">
     <div className="capability-icon"><Icon size={22}/></div>
@@ -280,15 +272,14 @@ function CapabilityPage({ section, user, firebaseUser, demoSession, companyId, o
     <div className="connection-card">
       <div className="connection-status-icon"><Activity size={18}/></div>
       <div className="connection-copy"><span className="connection-label">WORKSPACE CONNECTION</span><strong>{page.status}</strong><p>{page.detail}</p></div>
-      <span className="status-pill"><span/> {workspace ? 'Connected' : workspaceLoading ? 'Loading' : user ? 'Unavailable' : 'Sign in'}</span>
+      <span className="status-pill"><span/> {workspace?.connected ? 'Connected' : workspaceLoading ? 'Loading' : user ? 'General AI ready' : 'Sign in'}</span>
     </div>
     {workspace && section === 'graph' && <div className="download-platforms">{workspace.services.map((item) => <article key={item.id}><strong>{item.name}</strong><span>{item.team_name ? `Owned by ${item.team_name}` : 'No owner recorded'}</span><small>{item.id}</small></article>)}</div>}
     {workspace && section === 'sources' && <div className="download-platforms">{workspace.sources.length ? workspace.sources.map((item) => <article key={item.id}><strong>{item.type || 'Evidence source'}</strong><span>{item.url || item.id}</span><small>{item.id}</small></article>) : <article><strong>No linked sources yet</strong><span>The graph has no source records visible to this identity.</span></article>}</div>}
     {workspace && section === 'people' && <div className="download-platforms">{workspace.people.length ? workspace.people.map((item) => <article key={item.id}><strong>{item.name}</strong><span>{item.role} · {item.team_name}</span><small>{item.id}</small></article>) : <article><strong>No team directory entries in your access scope</strong><span>Your verified sign-in works. Join a company workspace or ask a teammate for an invitation.</span></article>}</div>}
     {!user && ['graph', 'sources', 'people'].includes(section) && <div className="capability-actions"><button className="primary-action" onClick={onLogin}>Sign in to load company data<ArrowUpRight size={15}/></button></div>}
-    {section === 'download' && <div className="download-platforms"><article><strong>Linux</strong><span>AppImage · .deb</span><small>Coming soon</small></article><article><strong>macOS</strong><span>Apple silicon · Intel</span><small>Coming soon</small></article><article><strong>Windows</strong><span>x64 installer</span><small>Coming soon</small></article></div>}
-    {showDetails && <div className="setup-detail"><strong>What you’ll need</strong><p>{section === 'graph' ? 'A private FalkorDB endpoint, credentials stored outside the repository, and the NexusHelper graph schema.' : section === 'sources' ? 'An approved connector, its OAuth/API credentials, and an access policy matching the source system.' : section === 'download' ? 'Release signing, platform packaging, and a published download endpoint. The app will use browser-based company sign-in and connect to the shared NexusHelper service.' : 'Firebase Authentication settings and Firestore company membership data.'}</p></div>}
-    {section !== 'download' && <div className="capability-actions"><button className="primary-action" onClick={handleAction}>{page.action}<ArrowUpRight size={15}/></button><span>{workspace ? 'Data shown is scoped to your verified identity.' : 'Sign in to load identity-scoped company data.'}</span></div>}
+    {showDetails && <div className="setup-detail"><strong>What you’ll need</strong><p>{section === 'graph' ? 'A private FalkorDB endpoint, credentials stored outside the repository, and the NexusHelper graph schema.' : section === 'sources' ? 'An approved connector, its OAuth/API credentials, and an access policy matching the source system.' : 'Firebase Authentication settings and Firestore company membership data.'}</p></div>}
+    <div className="capability-actions"><button className="primary-action" onClick={handleAction}>{page.action}<ArrowUpRight size={15}/></button><span>{workspace?.connected ? 'Data shown is scoped to your verified identity.' : 'Company records are unavailable; general NexusHelper questions can still be answered.'}</span></div>
   </div>;
 }
 

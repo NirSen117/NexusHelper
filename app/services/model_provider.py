@@ -176,6 +176,8 @@ conflicting, say so plainly. Never invent procedures, people, causes, credential
 or security details. Keep the answer concise and distinguish confirmed facts from
 unverified incident reports."""
 
+GENERAL_SYSTEM_PROMPT = """You are NexusHelper. Answer general questions helpfully using general knowledge. No company knowledge graph is connected for this request, so do not claim to know this company's internal people, policies, services, incidents, or decisions. If asked for internal company facts, explain that company records are not connected. Make clear when guidance is general rather than company-verified."""
+
 
 def _facts_prompt(query: str, tier_name: str, facts: dict[str, Any]) -> str:
     import json
@@ -200,7 +202,7 @@ class GeminiModelProvider(ModelProvider):
         import httpx
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent"
         payload = {
-            "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+            "systemInstruction": {"parts": [{"text": GENERAL_SYSTEM_PROMPT if facts.get("general_mode") else SYSTEM_PROMPT}]},
             "contents": [{"role": "user", "parts": [{"text": _facts_prompt(query, tier_name, facts)}]}],
             "generationConfig": {"temperature": 0.2, "maxOutputTokens": 900},
         }
@@ -227,7 +229,7 @@ class GroqModelProvider(ModelProvider):
         payload = {
             "model": self.model_name,
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": GENERAL_SYSTEM_PROMPT if facts.get("general_mode") else SYSTEM_PROMPT},
                 {"role": "user", "content": _facts_prompt(query, tier_name, facts)},
             ],
             "temperature": 0.2,

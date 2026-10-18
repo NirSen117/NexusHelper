@@ -5,7 +5,7 @@
 - FastAPI backend and a Vite/React UI.
 - Firebase ID token verification, enabled only when configured.
 - FalkorDB repository and a synthetic Cypher schema/seed.
-- No GCP resources or Firebase project are provisioned by this repository. No database endpoint or credentials are present.
+- GCP/Firebase resources are provisioned separately; credentials and endpoints are supplied through environment variables or Secret Manager.
 - Gemini and Groq adapters keep API keys on the backend, verify citations, and fall back to deterministic local responses if hosted model calls fail.
 - Profile and trusted membership repositories support local files for development and Firestore when `PROFILE_STORE=firestore`.
 
@@ -15,7 +15,7 @@ NexusHelper is intended to have a web UI and installable desktop clients. Deskto
 
 Firebase Authentication proves the user's identity; it does not by itself provide shared company authorization. Firestore is a good shared store for user profiles, organization membership references, team metadata, and audit metadata. Access decisions must be derived from company-owned memberships and enforced by the API. A designation and keywords entered by a user are searchable profile metadata only and must never grant access.
 
-The current query/relationship implementation uses FalkorDB as its graph store. Firestore stores profiles, companies, invitations, and team memberships; FalkorDB stores a separate graph for each company. To share the actual knowledge graph, either keep a centrally hosted, private FalkorDB service behind the API, or deliberately migrate graph queries and relationships to a Firestore-compatible data model. Do not connect desktop clients directly to a privileged graph database. The API is the trusted boundary for authorization and graph/model access.
+The current implementation uses FalkorDB for a separate graph per company. Firestore stores profiles, companies, invitations, and memberships; the backend routes each company to its graph. Keep FalkorDB reachable only by the backend and do not connect desktop clients directly to it. The API is the trusted boundary for authorization, graph queries, and model access. New company graphs are empty until records are ingested; import connectors are not yet implemented.
 
 For a genuinely local-only mode, the API and graph may run on the user's machine, but that mode does not share company data by itself. The planned cross-company mode requires a hosted API and shared database services reachable by all authorized clients.
 
@@ -26,14 +26,14 @@ The UI includes a platform download page, but release installers are not publish
 1. Install Python dependencies and run `uvicorn app.main:app --reload`.
 2. In `frontend/`, run `npm install`, copy `.env.example` to `.env`, then run `npm run dev`. If Firebase config is blank, click **Try demo**; the demo principal is synthetic and local-only.
 3. In Firebase Console, create/select a project and register a Web App. Enable Authentication > Google (or your company identity provider). Copy the web config into `frontend/.env`.
-4. Start FalkorDB locally, set `FALKORDB_*` in root `.env`, then apply `schema.cypher` to the `nexushelper` graph one statement at a time. It contains synthetic example records only.
+4. For a local graph-backed demo, start FalkorDB locally and set `FALKORDB_*` in root `.env`; run `./.venv/bin/python scripts/setup_local_falkordb.py` to load the fictional seed into an empty local graph. Alternatively, leave the example settings to use the synthetic in-memory demo graph.
 5. For local Firebase API auth, configure Application Default Credentials and `FIREBASE_AUTH_ENABLED=true`, `FIREBASE_PROJECT_ID=<project-id>`. Set the allowed frontend origin. Local demo auth uses server-configured `X-Demo-User` identities and must never be enabled in production.
 
 The designation and keyword fields are searchable profile details; they do not change access. In Firestore mode, users create a company or join through an invitation sent to their verified email. The company creator becomes its first owner and can invite teammates with selected team IDs and an optional 1–90 day expiry. Membership records are stored in `nexushelper_memberships`; each company maps to its own FalkorDB graph. The API uses Application Default Credentials locally and its Cloud Run runtime identity in production.
 
 ### Model providers
 
-Set `MODEL_PROVIDER=groq`, `GEMINI_API_KEY`, and optionally `GROQ_API_KEY`. Groq is tried first, Gemini is the secondary hosted model, and the deterministic local provider is the final fallback. `GEMINI_API_KEY` and `GROQ_API_KEY` are backend secrets only; never add them to `frontend/.env`, `VITE_*`, source control, the desktop bundle, or a browser request. You can set model names with `GEMINI_MODEL` and `GROQ_MODEL`. Straightforward lookups use deterministic grounded responses; model synthesis is reserved for contextual/investigation questions.
+Set `MODEL_PROVIDER=groq` and `GROQ_API_KEY` to use Groq as the primary hosted model; `GEMINI_API_KEY` enables the optional Gemini fallback. The deterministic local provider is the final fallback. The current query path invokes the configured model for lookup, contextual, and investigation questions, using the retrieved graph facts as grounding context. `GEMINI_API_KEY` and `GROQ_API_KEY` are backend secrets only; never add them to `frontend/.env`, `VITE_*`, source control, the desktop bundle, or a browser request. You can set model names with `GEMINI_MODEL` and `GROQ_MODEL`.
 
 ### Shared Firestore configuration
 
@@ -50,7 +50,7 @@ Set `PROFILE_STORE=firestore` and `FIRESTORE_PROJECT_ID` (or reuse `FIREBASE_PRO
 
 GCP resources are not created automatically by the app. Provision them in the intended Google Cloud/Firebase project and verify project IDs before deploying.
 
-The Firebase Hosting configuration and GitHub Actions workflow can deploy the frontend after a Firebase service-account secret and `FIREBASE_PROJECT_ID` repository variable are configured. The API still requires a private FalkorDB endpoint and Secret Manager entries before production deploy. Do not advertise a live shared workspace until those health checks pass.
+The Firebase Hosting configuration and GitHub Actions workflow can deploy the frontend after a Firebase service-account secret and `FIREBASE_PROJECT_ID` repository variable are configured. The live frontend and API endpoints are listed in the repository README. A successful API health check does not confirm that sign-in, model generation, or FalkorDB queries are healthy; verify those paths separately before relying on company data.
 
 `deploy/deploy-cloud-run.sh <project-id> [region]` deploys only to the explicitly supplied project. Before running it, create the `nexushelper-runtime` service account, grant it Firestore access for the companies, invitations, memberships, and profiles collections and Secret Manager accessor access to the named secrets, create/populate those secrets, and make the FalkorDB endpoint reachable from Cloud Run. This script deliberately does not infer the project from the local gcloud default.
 

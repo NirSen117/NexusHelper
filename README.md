@@ -1,22 +1,64 @@
 # NexusHelper
 
-A permission-aware organisational knowledge assistant built around FalkorDB. The starter focuses on the query path: cost-tiered routing, permission-scoped graph retrieval, evidence-grounded answers, and observable traces.
+**Submission track: Company Brain · Track 03**
 
-## Architecture
+NexusHelper is a company knowledge assistant built around a graph of people, teams, services, incidents, decisions, documents, and evidence. It retrieves graph records before asking a language model to explain them, and includes evidence with its answers.
 
-- **Tier 0 — Cache:** permission-scope keyed semantic cache; zero model calls.
-- **Tier 1 — Lookup:** scoped graph retrieval and concise response.
-- **Tier 2 — Contextual:** multi-hop context retrieval and synthesis.
-- **Tier 3 — Investigation:** context and incident history, investigation, deterministic verification, and cited response.
-- **Security boundary:** authentication and permissions are enforced in backend query construction before graph results reach any model.
+## Submission links
 
-The starter uses deterministic query routing, a permission-scoped graph repository, citation verification, Groq synthesis with optional Gemini fallback, and explicit abstention when evidence is missing. Company records, verified memberships, and invitations use shared Firestore. Every company receives a separate FalkorDB graph. The company creator becomes its first owner and can invite teammates by verified email, with optional temporary team access.
+- **Public source repository:** [github.com/NirSen117/NexusHelper](https://github.com/NirSen117/NexusHelper)
+- **Live web app:** [nexushelper-3eb6d.web.app](https://nexushelper-3eb6d.web.app)
+- **API health:** [NexusHelper API](https://nexushelper-api-263908316387.asia-south1.run.app/health)
 
-## Quick start
+The live app requires Firebase sign-in. New company workspaces start with an empty FalkorDB graph; this repository does not yet include document or ticket import connectors. The included graph seed is fictional demo data.
 
-Requires Python 3.11+.
+## Graph data model
+
+Each company is assigned a distinct FalkorDB graph. Firestore holds company records, invitations, and memberships; graph knowledge stays in FalkorDB. The creator starts as a company owner and can invite verified email addresses with team scopes and an optional expiry.
+
+```mermaid
+graph LR
+  Employee -->|MEMBER_OF| Team
+  Employee -->|EXPERT_IN| Service
+  Team -->|OWNS| Service
+  Service -->|DEPENDS_ON| Service
+  Incident -->|AFFECTS| Service
+  Incident -->|RESOLVED_BY| Solution
+  Incident -->|RELATED_TO| Incident
+  Question -->|ABOUT| Incident
+  Question -->|ABOUT| Service
+  Solution -->|SUPPORTED_BY| Evidence
+  Solution -->|SUPERSEDES / CONTRADICTS| Solution
+  Evidence -->|EXTRACTED_FROM| Source
+  Document -->|DESCRIBES| Service
+  Incident -. team visibility .-> Team
+  Solution -. team visibility .-> Team
+  Document -. team visibility .-> Team
+  Evidence -. team visibility .-> Team
+```
+
+Nodes carry identifiers and labels such as service names, incident status, timestamps, confidence, provenance, validity dates, and visibility. `VISIBLE_TO` edges associate restricted records with teams. The canonical schema and fictional seed are in [schema.cypher](schema.cypher).
+
+## Query path and graph operations
+
+The backend’s executable FalkorDB queries are in [app/services/graph.py](app/services/graph.py). The product path is:
+
+1. `classify` in [app/services/router.py](app/services/router.py) uses lightweight rules to choose lookup, contextual, or investigation routing.
+2. `match_services` links query text to service aliases and names.
+3. `find_documents` and `find_incidents` retrieve related records; `find_owners` and `find_experts` retrieve directory relationships.
+4. `find_subgraph` follows incident, service, solution, evidence, and source edges for the answer’s evidence view.
+5. `check_verification` checks solution status and supersession/contradiction relationships; [app/services/verifier.py](app/services/verifier.py) checks answer citations against retrieved evidence.
+6. [app/services/query_service.py](app/services/query_service.py) assembles the grounded context and trace. Groq is the configured primary model; Gemini is an optional fallback.
+
+[schema.cypher](schema.cypher) also contains the schema, indexes, demo seed, and standalone Cypher examples for permission-scoped retrieval. Vector indexes are declared for future retrieval work; the current request path links services with aliases and uses graph queries rather than vector search.
+
+## Run locally
+
+Requirements: Python 3.11 or later and Node.js 20 or later.
 
 ```bash
+git clone https://github.com/NirSen117/NexusHelper.git
+cd NexusHelper
 cp .env.example .env
 python -m venv .venv
 source .venv/bin/activate
@@ -24,41 +66,35 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-In another terminal, run the UI:
+In a second terminal:
 
 ```bash
-cd frontend
+cd NexusHelper/frontend
 npm install
 cp .env.example .env
 npm run dev
 ```
 
-Without Firebase Web settings, click **Try demo** in the UI. Local demo mode uses the synthetic Alice/Platform identity and the synthetic graph; it is for development/demo only. For a real shared workspace, provision Firebase Authentication, Firestore, a private FalkorDB service, and configure production API secrets as described in [docs/SETUP.md](docs/SETUP.md).
+Open `http://localhost:5173` and choose **Try demo**. With the example settings, the API uses its synthetic in-memory graph and mock model; Firebase, Groq, Gemini, and a graph server are not needed for this local preview. API documentation is at `http://localhost:8000/docs`.
 
-Open `http://127.0.0.1:8000/docs` for the API docs. `POST /api/query` returns a selected tier, evidence, and a model-call trace. Without a trusted identity and FalkorDB connection, the API abstains. Never put user-controlled permission scopes into production requests.
+To use a local FalkorDB instance instead, start one with `docker run --rm -p 6379:6379 falkordb/falkordb:latest`, keep the example host/port in `.env`, then run:
 
-For local graph development, start FalkorDB with `docker run --rm -p 6379:6379 falkordb/falkordb:latest`, set connection values in `.env`, then apply statements in `schema.cypher` one at a time using FalkorDB Browser or `redis-cli GRAPH.QUERY`. The schema contains synthetic demo data; do not expose it to real users.
+```bash
+./.venv/bin/python scripts/setup_local_falkordb.py
+```
 
-See [docs/SETUP.md](docs/SETUP.md) for Firebase, database, and GCP provisioning steps.
+This loads the fictional sample graph only when the selected graph is empty. Do not load it into a company graph. For Firebase, Firestore, model-provider, FalkorDB Cloud, and deployment setup, see [docs/SETUP.md](docs/SETUP.md).
 
-NexusHelper is planned as both a browser app and installable desktop app. The UI has a platform downloads page, but installers are not published yet. Company-wide sharing requires a hosted API and shared database; a local-only install cannot share records with other employees by itself. See the shared-data and desktop-auth notes in the setup guide.
+## Configuration and security
 
-## Local configuration
+`.env.example` and `frontend/.env.example` contain placeholders only. Keep backend provider and graph credentials in the backend environment or a secret manager; never put them in `frontend/.env`, a `VITE_*` variable, source control, or a desktop package. Firebase web configuration is public client configuration; authorization is enforced by the backend using verified Firebase identity and Firestore membership records.
 
-Copy `.env.example` to `.env`. Never commit `.env`, credentials, or real company data. The starter intentionally contains no provider keys.
+## Known submission limits
 
-## Companies and teams
-
-Sign in with a verified Firebase identity, then create a company or accept a one-time invitation. The creator becomes a company owner. Owners invite people by email, assign team IDs, and can set access to expire after 1–90 days. Leaving the expiry blank grants continuing membership. Company data is isolated in a dedicated FalkorDB graph; Firestore stores company, invitation, and membership records. User-entered designation and keywords are profile details, never access grants.
-
-## Roadmap
-
-1. Provision the intended Firebase/GCP project, enable sign-in and Firestore, and configure runtime credentials.
-2. Provision a private FalkorDB service and connect it to the API through a private endpoint.
-3. Configure Gemini and Groq secrets, then validate grounded responses and team-scoped access with synthetic data.
-4. Configure company ownership, team membership, operational monitoring, backups, and retention.
-5. Publish signed web and desktop releases after end-to-end sign-in and authorization review.
+- The live UI/API are deployed, but company data ingestion from documents, tickets, or chats is not implemented yet.
+- Newly created company graphs are empty until data is loaded through a future ingestion workflow.
+- Installers are not published; use the local setup above for the desktop wrapper’s development preview.
 
 ## License
 
-All rights reserved. This project is currently private and unlicensed.
+All rights reserved. No license is granted to use, modify, or redistribute this project.

@@ -19,9 +19,34 @@ def _epoch(value: Any) -> int | None:
 
 
 async def answer_query(request: QueryRequest, principal: Principal,
-                       graph: BaseGraphRepository) -> QueryResponse:
+                       graph: BaseGraphRepository | None) -> QueryResponse:
     started = time.perf_counter()
     route = classify(request.query)
+    if graph is None:
+        output = await model_provider.synthesize(
+            request.query,
+            "general",
+            {"general_mode": True, "documents": [], "incidents": [], "services": []},
+            principal.user_id,
+        )
+        return QueryResponse(
+            answer=output.answer,
+            confidence=output.confidence if not output.abstained else 0.0,
+            evidence=[],
+            trace=QueryTrace(
+                tier=route.tier,
+                tier_name="general (no company graph)",
+                agents_run=["response"],
+                model_calls=output.model_calls,
+                latency_ms=round((time.perf_counter() - started) * 1000, 1),
+                cache_hit=False,
+                reasons=["No company graph connected; answering general questions only"],
+                entities_detected=[],
+            ),
+            abstained=output.abstained,
+            abstention_reason=output.abstention_reason,
+            is_synthetic=False,
+        )
     evidence: list[Evidence] = []
     services: list[str] = []
     incidents: list[dict[str, Any]] = []

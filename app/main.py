@@ -30,9 +30,17 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+firebase_origins = (
+    [
+        f"https://{settings.firebase_project_id}.web.app",
+        f"https://{settings.firebase_project_id}.firebaseapp.com",
+    ]
+    if settings.firebase_project_id
+    else []
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=sorted(set(settings.cors_allowed_origins + [settings.frontend_origin])),
+    allow_origins=sorted(set(settings.cors_allowed_origins + [settings.frontend_origin] + firebase_origins)),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Company-ID", "X-Demo-User"],
