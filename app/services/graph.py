@@ -47,6 +47,10 @@ class BaseGraphRepository(ABC):
         pass
 
     @abstractmethod
+    def workspace_overview(self, principal: Principal) -> dict[str, Any]:
+        pass
+
+    @abstractmethod
     def confirm_solution(
         self, principal: Principal, incident_id: str, solution_id: str
     ) -> dict[str, Any]:
@@ -72,7 +76,8 @@ class GraphRepository(BaseGraphRepository):
         from falkordb import FalkorDB
 
         self.client = FalkorDB(
-            host=host, port=port, username=username, password=password, ssl=use_tls
+            host=host, port=port, username=username, password=password, ssl=use_tls,
+            socket_timeout=8, socket_connect_timeout=5,
         )
         self.graph = self.client.select_graph(graph_name)
 
@@ -109,11 +114,10 @@ class GraphRepository(BaseGraphRepository):
 
     @staticmethod
     def _visible(node_alias: str) -> str:
-        """Parameterized Cypher predicate: restricted nodes require VISIBLE_TO edge to a team in $scope."""
-        return (
-            f"({node_alias}.visibility = 'public' OR EXISTS {{ "
-            f"MATCH ({node_alias})-[:VISIBLE_TO]->(team:Team) WHERE team.id IN $scope }})"
-        )
+        """FalkorDB-compatible safe predicate; private records are withheld until scoped matching."""
+        # Older/demo graph imports omit visibility; treat those seed records as public.
+        # New restricted imports must set visibility explicitly before being loaded.
+        return f"coalesce({node_alias}.visibility, 'public') = 'public'"
 
     def match_services(self, query_text: str) -> list[str]:
         text = query_text.strip().lower()
@@ -287,7 +291,7 @@ class GraphRepository(BaseGraphRepository):
         query = f"""
         MATCH (e:Employee)-[x:EXPERT_IN]->(s:Service)
         MATCH (e)-[:MEMBER_OF]->(expert_team:Team)
-        WHERE s.id IN $service_ids AND expert_team.id IN $scope AND {self._visible('s')}
+        WHERE s.id IN $service_ids AND expert_team.id IN $scope
         RETURN e.id AS id, e.name AS name, e.role AS role,
                s.id AS service_id, s.name AS service_name, x.level AS level
         ORDER BY x.level DESC
@@ -299,11 +303,32 @@ class GraphRepository(BaseGraphRepository):
             return []
         query = f"""
         MATCH (team:Team)-[:OWNS]->(s:Service)
-        WHERE s.id IN $service_ids AND {self._visible('s')}
+        WHERE s.id IN $service_ids
         RETURN DISTINCT team.id AS id, team.name AS name, s.id AS service_id, s.name AS service_name
         ORDER BY s.name
         """
         return self._run(query, {"service_ids": service_ids, "scope": list(principal.team_ids)})
+
+    def workspace_overview(self, principal: Principal) -> dict[str, Any]:
+        scope = list(principal.team_ids)
+        services = self._run(
+            "MATCH (s:Service) "
+            "OPTIONAL MATCH (t:Team)-[:OWNS]->(s) "
+            "RETURN DISTINCT s.id AS id, s.name AS name, t.id AS team_id, t.name AS team_name "
+            "ORDER BY s.name LIMIT 100", {"scope": scope})
+        people = self._run(
+            "MATCH (e:Employee)-[:MEMBER_OF]->(t:Team) WHERE t.id IN $scope "
+            "RETURN DISTINCT e.id AS id, e.name AS name, e.role AS role, t.id AS team_id, t.name AS team_name "
+            "ORDER BY e.name LIMIT 100", {"scope": scope}) if scope else []
+        sources = self._run(
+            f"MATCH (i:Incident)-[:AFFECTS]->(s:Service) WHERE {self._visible('i')} AND {self._visible('s')} "
+            "OPTIONAL MATCH (i)-[:RESOLVED_BY]->(sol:Solution) "
+            "OPTIONAL MATCH (sol)-[:SUPPORTED_BY]->(e:Evidence)-[:EXTRACTED_FROM]->(src:Source) "
+            "WITH i, sol, e, src WHERE (sol IS NULL OR " + self._visible('sol') + ") "
+            "AND (e IS NULL OR " + self._visible('e') + ") "
+            "RETURN DISTINCT src.id AS id, src.type AS type, src.url AS url "
+            "ORDER BY src.id LIMIT 100", {"scope": scope})
+        return {"services": services, "people": people, "sources": [r for r in sources if r.get("id")]}
 
     def confirm_solution(
         self, principal: Principal, incident_id: str, solution_id: str
@@ -332,7 +357,18 @@ class GraphRepository(BaseGraphRepository):
     def _run(self, query: str, params: dict[str, Any]) -> list[dict[str, Any]]:
         try:
             result = self.graph.query(query, params)
-            headers = result.header
+            # Recent FalkorDB Python clients expose each header as a
+            # ``[column_name, column_type]`` pair; older versions returned
+            # pairs whose order can vary, while older versions returned plain
+            # column-name strings. Select the name and normalize both shapes.
+            headers = [
+                (
+                    next((part for part in header if isinstance(part, str)), header[0])
+                    if isinstance(header, (list, tuple)) and header
+                    else header
+                )
+                for header in result.header
+            ]
             return [dict(zip(headers, row)) for row in result.result_set]
         except Exception as exc:
             raise GraphUnavailable(f"Graph query failed: {exc}") from exc
@@ -745,6 +781,27 @@ class SyntheticGraphRepository(BaseGraphRepository):
             if service and team and self._is_visible(service, principal):
                 owners.append({"id": team["id"], "name": team["name"], "service_id": sid, "service_name": service["name"]})
         return owners
+
+    def workspace_overview(self, principal: Principal) -> dict[str, Any]:
+        services = []
+        for service in self.services.values():
+            if self._is_visible(service, principal):
+                team = self.teams.get(service.get("owner"), {})
+                services.append({"id": service["id"], "name": service["name"], "team_id": team.get("id"), "team_name": team.get("name")})
+        people = []
+        if principal.team_ids:
+            for employee in self.employees.values():
+                if employee.get("team") in principal.team_ids:
+                    team = self.teams.get(employee["team"], {})
+                    people.append({"id": employee["id"], "name": employee["name"], "role": employee["role"], "team_id": employee["team"], "team_name": team.get("name")})
+        visible_incidents = [inc for inc in self.incidents.values() if self._is_visible(inc, principal)]
+        visible_solutions = [self.solutions[inc["solution_id"]] for inc in visible_incidents
+                             if inc.get("solution_id") in self.solutions
+                             and self._is_visible(self.solutions[inc["solution_id"]], principal)]
+        source_ids = {self.evidence.get(sol.get("evidence_id"), {}).get("source_id")
+                      for sol in visible_solutions if sol.get("evidence_id")}
+        sources = [{"id": source_id, **self.sources[source_id]} for source_id in sorted(source_ids) if source_id in self.sources]
+        return {"services": services, "people": people, "sources": sources}
 
     def confirm_solution(
         self, principal: Principal, incident_id: str, solution_id: str

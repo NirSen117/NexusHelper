@@ -10,7 +10,7 @@ A permission-aware organisational knowledge assistant built around FalkorDB. The
 - **Tier 3 — Investigation:** context and incident history, investigation, deterministic verification, and cited response.
 - **Security boundary:** authentication and permissions are enforced in backend query construction before graph results reach any model.
 
-The starter uses deterministic query routing, a permission-scoped graph repository, citation verification, Gemini synthesis with Groq fallback, and explicit abstention when evidence is missing. Profiles and administrator-managed memberships can use shared Firestore; the connected knowledge graph remains in FalkorDB.
+The starter uses deterministic query routing, a permission-scoped graph repository, citation verification, Groq synthesis with optional Gemini fallback, and explicit abstention when evidence is missing. Company records, verified memberships, and invitations use shared Firestore. Every company receives a separate FalkorDB graph. The company creator becomes its first owner and can invite teammates by verified email, with optional temporary team access.
 
 ## Quick start
 
@@ -47,12 +47,16 @@ NexusHelper is planned as both a browser app and installable desktop app. The UI
 
 Copy `.env.example` to `.env`. Never commit `.env`, credentials, or real company data. The starter intentionally contains no provider keys.
 
+## Companies and teams
+
+Sign in with a verified Firebase identity, then create a company or accept a one-time invitation. The creator becomes a company owner. Owners invite people by email, assign team IDs, and can set access to expire after 1–90 days. Leaving the expiry blank grants continuing membership. Company data is isolated in a dedicated FalkorDB graph; Firestore stores company, invitation, and membership records. User-entered designation and keywords are profile details, never access grants.
+
 ## Roadmap
 
 1. Provision the intended Firebase/GCP project, enable sign-in and Firestore, and configure runtime credentials.
 2. Provision a private FalkorDB service and connect it to the API through a private endpoint.
 3. Configure Gemini and Groq secrets, then validate grounded responses and team-scoped access with synthetic data.
-4. Configure company membership administration, operational monitoring, backups, and retention.
+4. Configure company ownership, team membership, operational monitoring, backups, and retention.
 5. Publish signed web and desktop releases after end-to-end sign-in and authorization review.
 
 ## License

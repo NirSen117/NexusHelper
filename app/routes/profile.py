@@ -24,7 +24,8 @@ async def my_profile(principal: Principal = Depends(get_principal)) -> dict:
         "department": profile.department if profile else "",
         "keywords": profile.keywords if profile else [],
         "team_ids": list(principal.team_ids),
-        "is_admin": principal.is_admin,
+        "company_id": principal.company_id,
+        "role": principal.role,
         "profile_setup_required": profile is None,
         "saved": profile is not None,
         "message": "Profile loaded." if profile else "Complete your profile to help coworkers find your expertise.",
@@ -47,8 +48,9 @@ async def update_profile(body: ProfileUpdate, principal: Principal = Depends(get
     return {
         **saved.to_dict(),
         "team_ids": list(principal.team_ids),
-        "is_admin": principal.is_admin,
+        "company_id": principal.company_id,
+        "role": principal.role,
         "profile_setup_required": False,
         "saved": True,
-        "message": "Profile saved. Your self-entered designation and keywords do not grant data access.",
+        "message": "Profile saved. Company and team access comes from verified membership.",
     }

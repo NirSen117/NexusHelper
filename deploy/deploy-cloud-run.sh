@@ -29,5 +29,5 @@ gcloud run deploy nexushelper-api \
   --allow-unauthenticated \
   --memory 1Gi \
   --cpu 2 \
-  --set-env-vars "APP_ENV=production,DEMO_AUTH_ENABLED=false,FIREBASE_AUTH_ENABLED=true,FIREBASE_PROJECT_ID=${PROJECT_ID},FIRESTORE_PROJECT_ID=${PROJECT_ID},PROFILE_STORE=firestore,MODEL_PROVIDER=gemini,FRONTEND_ORIGIN=https://${PROJECT_ID}.web.app,FALKORDB_HOST=${FALKORDB_HOST},FALKORDB_PORT=${FALKORDB_PORT:-6379},FALKORDB_USE_TLS=true" \
-  --set-secrets "GEMINI_API_KEY=gemini-api-key:latest,GROQ_API_KEY=groq-api-key:latest,FALKORDB_PASSWORD=falkordb-password:latest"
+  --set-env-vars "^~^APP_ENV=production~DEMO_AUTH_ENABLED=false~FIREBASE_AUTH_ENABLED=true~FIREBASE_PROJECT_ID=${PROJECT_ID}~FIRESTORE_PROJECT_ID=${PROJECT_ID}~PROFILE_STORE=firestore~MODEL_PROVIDER=groq~FRONTEND_ORIGIN=https://${PROJECT_ID}.web.app~FALKORDB_HOST=${FALKORDB_HOST}~FALKORDB_PORT=${FALKORDB_PORT:-6379}~FALKORDB_USERNAME=${FALKORDB_USERNAME:-}~FALKORDB_USE_TLS=${FALKORDB_USE_TLS:-true}" \
+  --set-secrets "GROQ_API_KEY=groq-api-key:latest,FALKORDB_PASSWORD=falkordb-password:latest"

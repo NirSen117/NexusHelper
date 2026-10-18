@@ -6,7 +6,7 @@ from typing import Any
 from app.security import Principal
 from app.schemas import Evidence, Expert, QueryRequest, QueryResponse, QueryTrace, SubGraph, GraphNode, GraphEdge
 from app.services.graph import BaseGraphRepository, GraphUnavailable
-from app.services.model_provider import MockModelProvider, ModelOutput, model_provider
+from app.services.model_provider import model_provider
 from app.services.router import classify
 from app.services.verifier import verify_claims
 
@@ -88,19 +88,17 @@ async def answer_query(request: QueryRequest, principal: Principal,
         elif expert_query:
             for row in experts:
                 evidence.append(Evidence(node_id=str(row["id"]), label=str(row.get("name", "Employee")), summary=str(row.get("role", "Verified team expertise")), node_type="employee", confidence=0.8, status="directory_verified"))
-        facts = {"documents": fact_docs, "incidents": fact_incidents, "services": services}
+        facts = {
+            "documents": fact_docs,
+            "incidents": fact_incidents,
+            "services": services,
+            "verified_owners": owners,
+            "verified_experts": experts,
+        }
 
-        # Ownership and expertise use deterministic scoped directory data. Model APIs handle synthesis tiers only.
-        if owner_query and owners:
-            clauses = [f"{row.get('service_name', 'Service')} is owned by {row.get('name', 'a team')} [{row['id']}]" for row in owners]
-            output = ModelOutput(answer="\n".join(clauses), cited_node_ids=[str(row["id"]) for row in owners], model_calls=0, confidence=0.9)
-        elif expert_query and experts:
-            clauses = [f"{row.get('name', 'A colleague')} ({row.get('role', 'team member')}) is listed as a verified expert for {row.get('service_name', 'this service')} [{row['id']}]" for row in experts]
-            output = ModelOutput(answer="\n".join(clauses), cited_node_ids=[str(row["id"]) for row in experts], model_calls=0, confidence=0.8)
-        else:
-            # Deterministic lookup for straightforward questions; model APIs only for synthesis tiers.
-            provider = model_provider if route.tier >= 2 else MockModelProvider()
-            output = await provider.synthesize(request.query, route.name, facts, principal.user_id)
+        # Groq is the primary answer model for every question, including directory
+        # questions. Evidence retrieval and citation verification remain deterministic.
+        output = await model_provider.synthesize(request.query, route.name, facts, principal.user_id)
         checks = graph.check_verification(principal, list(dict.fromkeys(solution_ids))) if solution_ids else []
         verification = verify_claims(output.answer, output.cited_node_ids, evidence, checks)
         answer = output.answer

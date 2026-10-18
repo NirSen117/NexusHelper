@@ -17,6 +17,8 @@ docs/AGENT_HANDOFF.md
 
 # Editor / OS
 .DS_Store
+.firebase/
+firebase-debug.log
 .vscode/
 .idea/
 frontend/node_modules/

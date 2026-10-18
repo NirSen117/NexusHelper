@@ -182,7 +182,8 @@ def _facts_prompt(query: str, tier_name: str, facts: dict[str, Any]) -> str:
     bounded = {
         "query": query[:4000],
         "route": tier_name,
-        "records": facts.get("documents", [])[:8] + facts.get("incidents", [])[:12],
+        "records": facts.get("documents", [])[:8] + facts.get("incidents", [])[:12]
+                   + facts.get("verified_owners", [])[:12] + facts.get("verified_experts", [])[:12],
         "services": facts.get("services", [])[:20],
     }
     return json.dumps(bounded, ensure_ascii=False, default=str)[:30000]

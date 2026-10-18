@@ -28,9 +28,7 @@ class Settings(BaseSettings):
         "emp-alice": ["team-platform"],
         "emp-bob": ["team-payments"],
         "emp-carol": ["team-security"],
-        "emp-admin": ["team-platform", "team-payments", "team-security"],
     }
-    demo_admin_users: list[str] = ["emp-admin"]
 
     firebase_auth_enabled: bool = False
     firebase_project_id: str | None = None
@@ -60,7 +58,6 @@ class Settings(BaseSettings):
     firestore_project_id: str | None = None
     firestore_profiles_collection: str = "nexushelper_profiles"
     firestore_memberships_collection: str = "nexushelper_memberships"
-
     # Storage paths for local dev abstractions
     data_dir: str = ".local_data"
 

@@ -87,7 +87,8 @@ class ProfileResponse(BaseModel):
     department: str
     keywords: list[str]
     team_ids: list[str]
-    is_admin: bool
+    company_id: str | None = None
+    role: str = "member"
     profile_setup_required: bool
     saved: bool = True
     message: str
@@ -108,15 +109,24 @@ class FeedbackResponse(BaseModel):
     message: str
 
 
-class MembershipUpdateRequest(BaseModel):
+class CompanyCreateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+
+
+class InvitationCreateRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+    team_ids: list[str] = Field(default_factory=list, max_length=30)
+    expires_in_days: int | None = Field(default=None, ge=1, le=90)
+
+
+class InvitationAcceptRequest(BaseModel):
+    code: str = Field(min_length=20, max_length=128)
+
+
+class CompanyMemberUpdateRequest(BaseModel):
     team_ids: list[str] = Field(default_factory=list)
-    is_admin: bool | None = None
-
-
-class MembershipResponse(BaseModel):
-    user_id: str
-    team_ids: list[str]
-    is_admin: bool
+    role: str = "member"
+    expires_in_days: int | None = Field(default=None, ge=1, le=90)
 
 
 class SetupStatusResponse(BaseModel):
